@@ -1,0 +1,10 @@
+logs/
+npy/
+mypy.ini
+.mypy_cache/
+.vscode/
+cauchy_extensions/
+tmp/
+FordA/
+figures/CFLs
+figures/GPs
