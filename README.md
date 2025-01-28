@@ -11,7 +11,7 @@ Follow these steps to utilize the example code provided with our paper:
 
 ### Step 2: Learn to Estimate Log-Likelihood Ratios
 - Execute `density_ratio_estimation_main.py`.
-  - Update `./config/config_definition.py` to include paths to the LMDB datasets before running the density ratio estimation.
+  - Update `./config/config_dre.py` to include paths to the LMDB datasets before running the density ratio estimation.
 
 ### Step 3: Train the Model
 - Train on the generated dataset by running `backward_induction_GP_train.py` or `backward_induction_CFL_train.py`.

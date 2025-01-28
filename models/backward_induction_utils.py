@@ -642,13 +642,13 @@ def CFL_training_routine(
             "T_MULT",
             "RANGE_LAMBDA_OPTUNA",
             "IS_LLR_AS_SUFFICIENT_STATISTIC",
-            "SAVEDIR",
+            "CFL_DIR",
         ]
     )
     conf = extract_params_from_config(requirements, config_cfl)
 
     dirname = (
-        f"{conf.savedir}/{subproject}/penalty{penalty}_cost{cost}"
+        f"{conf.cfl_dir}/{subproject}/penalty{penalty}_cost{cost}"
         f"_bst{conf.batch_size_tuning}bsf{conf.batch_size_fitting}"
         f"_{conf.num_folds}fold_tmult{conf.t_mult}_{conf.range_lambda_optuna}"
         f"_isllrs{conf.is_llr_as_sufficient_statistic}"
@@ -2200,3 +2200,397 @@ class DCRegressionModel(BaseClassCFL):
         pred = f1 - f2
 
         return pred
+
+
+def train_single_model(
+        path_modeldir: str, 
+        cnt_model: int, 
+        config_cfl: dict
+        ):
+    """
+    Train a single model given a path containing checkpoint or data, returning
+    the updated model counter.
+
+    Parameters
+    ----------
+    path_modeldir : str
+        Path to the directory containing the dataset/checkpoints.
+    cnt_model : int
+        Current model index (will be incremented before returning).
+    config_cfl : dict
+        Configuration dictionary including hyperparameters for the CFL model.
+
+    Returns
+    -------
+    cnt_model : int
+        Updated model index.
+    """
+    # Unpack config parameters
+    penalty_L = config_cfl["PENALTY_L"]
+    cost_pool = config_cfl["COST_POOL"]
+    subproject = config_cfl["SUBPROJECT"]
+
+    logger.info(f"Processing Model Num {cnt_model + 1}: {path_modeldir}")
+    key = path_modeldir.split("/")[-1]
+
+    # Load the train data
+    llrs, labels, cnt_model, num_data, time_steps = extract_llrs_from_dataset(
+        path_modeldir,
+        phase="train",  # 'train', 'val', or 'test'
+        gpu=0,
+        cnt_model=cnt_model,
+    )
+
+    # Iterate over each cost
+    for targ_cost in cost_pool:
+        if targ_cost > penalty_L / 2:
+            logger.info("cost too high, skipping this combination...")
+            logger.info(f"penalty_L={penalty_L}, targ_cost={targ_cost}")
+            continue
+
+        # Call the custom training routine
+        model_pool = CFL_training_routine(
+            torch.tensor(llrs, device="cuda", dtype=torch.float32),
+            penalty_L,
+            targ_cost,
+            f"estimatedLLRs/{subproject}/{key}",
+            config_cfl,
+        )
+        # You can do something here with model_pool if needed
+    return cnt_model
+
+
+def train_single_model_gp(
+        path_modeldir: str, 
+        cnt_model: int, 
+        config_gp: dict):
+    """
+    Train a single GP model given a path containing checkpoint or data,
+    returning the updated model counter.
+
+    Parameters
+    ----------
+    path_modeldir : str
+        Path to the directory containing checkpoints/data.
+    cnt_model : int
+        Current model index (will be incremented before returning).
+    config_gp : dict
+        Configuration dictionary including hyperparameters for the GP model.
+
+    Returns
+    -------
+    cnt_model : int
+        Updated model index.
+    """
+    # Extract config parameters
+    penalty_L = config_gp["PENALTY_L"]
+    cost_pool = config_gp["COST_POOL"]
+    epochs_gp = config_gp["EPOCHS_GP"]
+    batch_size_gp = config_gp["BATCH_SIZE_GP"]
+    num_inducing_points = config_gp["NUM_INDUCING_POINTS"]
+    is_llr_as_sufficient_statistic = config_gp["IS_LLR_AS_SUFFICIENT_STATISTIC"]
+    savedir = config_gp["SAVE_DIR"]
+    subproject = config_gp["SUBPROJECT"]
+
+    logger.info(f"\nModel Num {cnt_model + 1}: {path_modeldir}")
+    key = path_modeldir.split("/")[-1]
+
+    # Load training data
+    llrs, labels, cnt_model, num_data, time_steps = extract_llrs_from_dataset(
+        path_modeldir,
+        phase="train",  # 'train', 'val', or 'test'
+        gpu=0,
+        cnt_model=cnt_model,
+    )
+
+    # Iterate over each cost in cost_pool
+    for targ_cost in cost_pool:
+        if targ_cost > penalty_L / 2:
+            logger.info("cost too high, skipping this combination...")
+            logger.info(f"penalty_L={penalty_L}, targ_cost={targ_cost}")
+            continue
+
+        GP_training_routine(
+            torch.tensor(llrs, device="cuda", dtype=torch.float32),
+            penalty_L,
+            targ_cost,
+            f"{subproject}/{key}",
+            epochs_gp,
+            batch_size_gp,
+            num_inducing_points,
+            is_llr_as_sufficient_statistic,
+            savedir=savedir,
+        )
+
+    return cnt_model
+
+
+
+def batch_decision_inference(
+    model_pool,
+    llrs_all: np.ndarray,
+    labels_all: np.ndarray,
+    penalty_L: float,
+    targ_cost: float,
+    is_llr_as_sufficient_statistic: bool,
+    config_dict: dict
+):
+    """
+    Perform batch decision inference over the dataset using the trained model pool.
+
+    Parameters
+    ----------
+    model_pool : Any
+        The trained CFL model(s) (format depends on your saving/loading approach).
+    llrs_all : np.ndarray
+        Log-likelihood ratios for the entire dataset.
+    labels_all : np.ndarray
+        Corresponding ground-truth labels.
+    penalty_L : float
+        The penalty factor L used in the model.
+    targ_cost : float
+        The specific target cost to evaluate.
+    is_llr_as_sufficient_statistic : bool
+        If True, the model treats LLR as the sufficient statistic.
+    config_dict : dict
+        The main configuration dictionary (from config_cfl.py).
+
+    Returns
+    -------
+    hitting_time : np.ndarray
+        The array of hitting times for each sample.
+    predictions : np.ndarray
+        The array of predicted classes for each sample.
+    """
+    num_data = len(llrs_all)
+    batch_size = cast(int, config_dict["BATCH_SIZE_TUNING"])
+    iter_num = int(np.ceil(num_data / batch_size))
+
+    hitting_time = np.ones(num_data)
+    predictions = np.ones(num_data)
+
+    for idx_iter in range(iter_num):
+        if idx_iter % 10 == 0:
+            logger.info(f"Iterating over LLRs... {idx_iter + 1}/{iter_num}")
+
+        idx_start = idx_iter * batch_size
+        idx_end = (idx_iter + 1) * batch_size
+
+        # Move batch to GPU for inference
+        llrs_batch = torch.tensor(llrs_all[idx_start:idx_end], device="cuda", dtype=torch.float32)
+        # labels_batch = torch.tensor(labels_all[idx_start:idx_end], device="cuda", dtype=torch.int64)
+
+        ht_batch, pred_batch = decision_helper_cfl(
+            model_pool,
+            penalty_L,
+            targ_cost,
+            llrs_batch,
+            is_llr_as_sufficient_statistic,
+        )
+        hitting_time[idx_start:idx_end] = ht_batch.cpu().numpy()
+        predictions[idx_start:idx_end] = pred_batch.cpu().numpy()
+
+    return hitting_time, predictions
+
+
+def test_single_model(
+    path_modeldir: str,
+    cnt_model: int,
+    config_cfl: dict
+) -> int:
+    """
+    Evaluate/test a single model stored in the specified directory.
+
+    Parameters
+    ----------
+    path_modeldir : str
+        Path to the directory containing model checkpoints or data.
+    cnt_model : int
+        Counter for the current model index.
+    config_cfl : dict
+        Configuration dictionary including hyperparameters for the CFL model.
+
+    Returns
+    -------
+    cnt_model : int
+        Updated model counter after processing.
+    """
+    logger.info(f"\nModel Num {cnt_model + 1}: {path_modeldir}")
+    key = path_modeldir.split("/")[-1]
+
+    # Unpack relevant config parameters
+    penalty_L = config_cfl["PENALTY_L"]
+    cost_pool = config_cfl["COST_POOL"]
+    is_llr_as_sufficient_statistic = config_cfl["IS_LLR_AS_SUFFICIENT_STATISTIC"]
+    savedir = config_cfl["SAVE_DIR"]
+    subproject = config_cfl["SUBPROJECT"]
+
+    # Extract test data from the dataset
+    llrs_all, labels_all, cnt_model, num_data, time_steps = extract_llrs_from_dataset(
+        path_modeldir,
+        phase="test",  # 'train', 'val', or 'test'
+        gpu=0,
+        cnt_model=cnt_model,
+    )
+
+    # For computational efficiency, sample from the dataset
+    # max_data_num = max(
+    #     cast(int, config_cfl["BATCH_SIZE_TUNING"]),
+    #     cast(int, config_cfl["BATCH_SIZE_FITTING"])
+    # )
+    # dice = np.random.randint(0, len(llrs_all), max_data_num)
+    # Optionally, you can skip random sampling if you want to test on the full dataset
+    # llrs_subset = llrs_all[dice]
+    # labels_subset = labels_all[dice]
+
+    # Evaluate for each target cost in the cost pool
+    for targ_cost in cost_pool:
+        if targ_cost > penalty_L / 2:
+            logger.info("cost too high, skipping this combination...")
+            logger.info(f"penalty_L={penalty_L}, targ_cost={targ_cost}")
+            continue
+
+        # Construct path to the saved model
+        targ_dict = (
+            f"{savedir}/{subproject}/{key}/"
+            f"penalty{penalty_L}_cost{targ_cost}"
+            f"_bst{config_cfl['BATCH_SIZE_TUNING']}bsf{config_cfl['BATCH_SIZE_FITTING']}"
+            f"_{config_cfl['NUM_FOLDS']}fold_tmult{config_cfl['T_MULT']}"
+            f"_{config_cfl['RANGE_LAMBDA_OPTUNA']}_isllrs{is_llr_as_sufficient_statistic}/"
+        )
+
+        # Load the model(s)
+        model_pool = load_cfl_models(model_path=targ_dict + "CFLmodels.pt")
+
+        # Perform batch decision inference
+        hitting_time, predictions = batch_decision_inference(
+            model_pool=model_pool,
+            llrs_all=llrs_all,
+            labels_all=labels_all,
+            penalty_L=penalty_L,
+            targ_cost=targ_cost,
+            is_llr_as_sufficient_statistic=is_llr_as_sufficient_statistic,
+            config_dict=config_cfl
+        )
+
+        # Evaluate accuracy per class (SNS) across the entire dataset
+        sns = calc_sns(
+            torch.tensor(labels_all, device="cpu", dtype=torch.int64),
+            torch.tensor(predictions, device="cpu", dtype=torch.int64),
+        )
+
+        logger.success(f"Result with targ_cost={targ_cost}")
+        logger.success(f"Average per-class error rate: {1.0 - torch.mean(sns):.4f}")
+        logger.success(f"Mean hitting time: {np.mean(hitting_time):.4f}")
+
+    return cnt_model
+
+
+def test_single_model_gp(
+        path_modeldir: str, 
+        cnt_model: int, 
+        config_gp: dict
+        ) -> int:
+    """
+    Test/evaluate a single GP model directory.
+
+    Parameters
+    ----------
+    path_modeldir : str
+        Path to the directory containing checkpoints/data.
+    cnt_model : int
+        Counter for the current model index.
+    config_gp : dict
+        Configuration dictionary including hyperparameters for the GP model.
+
+    Returns
+    -------
+    cnt_model : int
+        Updated model counter after processing.
+    """
+    penalty_L = config_gp["PENALTY_L"]
+    cost_pool = config_gp["COST_POOL"]
+    epochs_gp = config_gp["EPOCHS_GP"]
+    batch_size_gp = config_gp["BATCH_SIZE_GP"]
+    num_inducing_points = config_gp["NUM_INDUCING_POINTS"]
+    is_llr_as_sufficient_statistic = config_gp["IS_LLR_AS_SUFFICIENT_STATISTIC"]
+    savedir = config_gp["SAVE_DIR"]
+    subproject = config_gp["SUBPROJECT"]
+    gpu = config_gp["GPU"]
+
+    logger.info(f"\nModel Num {cnt_model + 1}: {path_modeldir}")
+    key = path_modeldir.split("/")[-1]
+
+    # Load test data
+    llrs_all, labels_all, cnt_model, num_data, time_steps = extract_llrs_from_dataset(
+        path_modeldir,
+        phase="test",   # 'train', 'val', or 'test'
+        gpu=gpu,
+        cnt_model=cnt_model,
+    )
+
+    # Number of batch iterations
+    iter_num = int(np.ceil(num_data / batch_size_gp))
+
+    # Evaluate for each cost in cost_pool
+    for targ_cost in cost_pool:
+        if targ_cost > penalty_L / 2:
+            logger.info("cost too high, skipping this combination...")
+            logger.info(f"penalty_L={penalty_L}, targ_cost={targ_cost}")
+            continue
+
+        # Construct path to saved model
+        targ_dict = (
+            f"{savedir}/{subproject}/{key}/"
+            f"penalty{penalty_L}_cost{targ_cost}_"
+            f"batchsize{batch_size_gp}_indpnt{num_inducing_points}_epoch{epochs_gp}_"
+            f"isllrs{is_llr_as_sufficient_statistic}/"
+        )
+
+        # Load model and likelihood
+        model_pool, likelihood_pool = load_gaussian_process_models(
+            model_path=targ_dict + "GPmodels.pt",
+            likelihood_path=targ_dict + "Likelihoodmodels.pt",
+        )
+
+        # Initialize arrays to store results
+        hitting_time = np.ones(num_data)
+        predictions = np.ones(num_data)
+
+        # Perform batch inference
+        for idx_iter in range(iter_num):
+            if idx_iter % 10 == 0:
+                logger.info(f"Iterating over LLRs... {idx_iter+1}/{iter_num}")
+
+            idx_start = idx_iter * batch_size_gp
+            idx_end = (idx_iter + 1) * batch_size_gp
+
+            llrs_batch = torch.tensor(
+                llrs_all[idx_start:idx_end], device="cuda", dtype=torch.float32
+            )
+            labels_batch = torch.tensor(
+                labels_all[idx_start:idx_end], device="cuda", dtype=torch.int64
+            )
+
+            ht_batch, pred_batch = decision_helper(
+                model_pool,
+                likelihood_pool,
+                penalty_L,
+                targ_cost,
+                llrs_batch,
+                is_llr_as_sufficient_statistic,
+            )
+            hitting_time[idx_start:idx_end] = ht_batch.cpu().numpy()
+            predictions[idx_start:idx_end] = pred_batch.cpu().numpy()
+
+        # Evaluate results
+        sns = calc_sns(
+            torch.tensor(labels_all, device="cpu", dtype=torch.int64),
+            torch.tensor(predictions, device="cpu", dtype=torch.int64),
+        )
+
+        logger.success(f"Result with targ_cost={targ_cost}")
+        logger.success(f"Average per-class error rate: {100*(1.0 - torch.mean(sns)):.2f}%")
+        logger.success(f"Mean hitting time: {np.mean(hitting_time):.4f}")
+
+    return cnt_model

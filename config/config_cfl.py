@@ -12,13 +12,18 @@ NAME_DATASET = "synthetic"
 LAMBDA_ = None  # None or a positive float(e.g., 0.25). Tuning starts if None.
 TUNING_METHOD = ["original", "optuna"][1]  # original grid search or optuna
 
-SAVEDIR = "./logs/CFLs/"
+ROOT_DIR ="./"
+CFL_DIR = "./logs/CFLs/"
+SAVE_DIR = CFL_DIR + "estimatedLLRs/"
+SUBPROJECT = "Example_2clsGaussoptimmacrec_try"
+
 IS_LLR_AS_SUFFICIENT_STATISTIC = False
 IS_SAVE_MEMORY = True  # save GPU memory if you run large-class classification
 PENALTY_L = 10.0
 COST_POOL_BASE = np.array(
     [0.1]
 )  # 0.1, 1.0, 2.0 # the actual cost will be multiplied by penalty/time_steps
+TIME_STEPS = 50
 
 # Used if TUNING_METHOD = "optuna"
 NUM_TRIALS = 30  # number of trials
@@ -74,6 +79,7 @@ config = {
     "BATCH_SIZE_FITTING": BATCH_SIZE_FITTING,
     "NUM_FOLDS": NUM_FOLDS,
     "MAX_HYPER_ITER": MAX_HYPER_ITER,
+    "TIME_STEPS": TIME_STEPS,
     "T_MULT": T_MULT,
     "LS_LAMBDAS": LS_LAMBDAS,
     "LS_LAMBDAS_MULT_LOW": LS_LAMBDAS_MULT_LOW,
@@ -88,7 +94,13 @@ config = {
     "STUDY_NAME": STUDY_NAME,
     "PENALTY_L": PENALTY_L,
     "COST_POOL_BASE": COST_POOL_BASE,
+    "COST_POOL": COST_POOL_BASE / TIME_STEPS * PENALTY_L,
     "IS_LLR_AS_SUFFICIENT_STATISTIC": IS_LLR_AS_SUFFICIENT_STATISTIC,
     "IS_SAVE_MEMORY": IS_SAVE_MEMORY,
-    "SAVEDIR": SAVEDIR,
+    "SAVE_DIR": SAVE_DIR,
+    "ROOT_DIR": ROOT_DIR,
+    "SUBPROJECT": SUBPROJECT,
+    "CFL_DIR": CFL_DIR,
+    "SAVE_DIR": SAVE_DIR,
+
 }

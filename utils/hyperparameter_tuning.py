@@ -576,7 +576,7 @@ def set_config_param(
     key: str, config: Dict[str, Any], trial: optuna.Trial, paramtable: ConsoleTable
 ) -> str:
     """
-    Set the value of a parameter in the config dictionary. See config_definition.py for detail.
+    Set the value of a parameter in the config dictionary. See config_dre.py for detail.
 
     Args:
         key (str): The name of the parameter to be set.

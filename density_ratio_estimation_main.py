@@ -11,7 +11,7 @@ from optuna.trial import Trial
 from termcolor import colored
 from tqdm import tqdm
 
-from config.config_definition import config as config_orig
+from config.config_dre import config as config_orig
 from utils.checkpoint import finalize_objectives
 from utils.hyperparameter_tuning import run_optuna, suggest_parameters
 from utils.logging import ContexualLogger, create_log_folders

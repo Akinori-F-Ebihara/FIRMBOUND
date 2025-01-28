@@ -14,7 +14,7 @@ LOG_PATH = CONFIG_PATH[: CONFIG_PATH.find("config")] + "logs/"
 # Data info
 NUM_CLASSES = 2
 DATA_SEPARATION = "0.5"
-DATA_PATH = "./datadir/"
+DATA_PATH = "./tmp/"
 DATA_FOLDER = f"ExampleGaussian_{NUM_CLASSES}class_offset{DATA_SEPARATION}"  # _dim2
 NUM_TRAIN = 20000  # 40000  # 300000  # 25000 # 19000
 NUM_VAL = 2000  # 4000  # 30000  # 4000 # # 990
