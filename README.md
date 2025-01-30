@@ -33,8 +33,8 @@ Run `density_ratio_estimation_main.py` to use the SPRT-TANDEM framework to estim
   - [SPRT-TANDEM-PyTorch](https://github.com/Akinori-F-Ebihara/SPRT-TANDEM-PyTorch)
   - [SPRT-TANDEM tutorial](https://github.com/Akinori-F-Ebihara/SPRT-TANDEM_tutorial)  
 
-### 3. Train **FIRMBOUND**
-Run either `backward_induction_CFL_train.py` or `backward_induction_GP_train.py` to use Convex Function Learning (CFL) or Gaussian Process (GP) regression, respectively.
+### 3. Train Convex Function Learning (CFL) or Gaussian Process (GP) regression to estimate the optimal thresholds
+Run either `backward_induction_CFL_train.py` or `backward_induction_GP_train.py` to use respectively.
 - Update the following parameters:
   - `savedir`: Directory to save model results.
   - `subproject`: Name matching Step 2 output.
@@ -78,11 +78,3 @@ If you use this code, please cite our paper:
   year={2025},
 }
 ```
-
-## References
-1. A. F. Ebihara, T. Miyagawa, K. Sakurai, and H. Imaoka. Sequential density ratio estimation for
-simultaneous optimization of speed and accuracy. In The International Conference on Learning
-Representations (ICLR), 2021.
-2. A. Siahkamari, D. A. E. Acar, C. Liao, K. L. Geyer, V. Saligrama, and B. Kulis. Faster algorithms
-for learning convex functions. In K. Chaudhuri, S. Jegelka, L. Song, C. Szepesvari, G. Niu, and
-S. Sabato (eds.), Proceedings of the 39th International Conference on Machine Learning (ICML), 2022.
