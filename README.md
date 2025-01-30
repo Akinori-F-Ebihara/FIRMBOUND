@@ -1,34 +1,47 @@
 # FIRMBOUND
-This repository contains the official PyTorch implementation of **FIRMBOUND**. Based on the Sequential Probability Ratio Test (SPRT), **FIRMBOUND** aims to optimize its decision time given a target error rate (i.e., optimal for early-classification of sequential data). However, unlike the original SPRT, **FIRMBOUND** optimizes the decision within *Finite Horizon*, or classification deadline by providing a time-dependent, dynamic decision threshoulds. 
+This repository contains the official PyTorch implementation of **FIRMBOUND**, a framework for **optimal early classification of sequential data** under finite-horizon constraints. **FIRMBOUND** builds upon the **Sequential Probability Ratio Test (SPRT)** but extends it to handle **finite decision deadlines** by learning dynamic, time-dependent decision thresholds.
 
 <div align="center">
 <figure>
-<img src ="./figures/Closing_Boundary_4github.GIF" width=70%>  
+<img src="./figures/Closing_Boundary_4github.GIF" width="70%">  
 </figure>
 </div>
-<p align="center">Figure 1: The original SPRT's static decision threshould (brown) and FIRMBOUND's dynamic threshold (orange).</p>
+
+<p align="center">Figure 1: SPRT's static threshold (brown) vs. FIRMBOUND's dynamic threshold (yellow).</p>
+
+---
+
+## Key Features
+- **Finite-Horizon Decision Making:** Unlike traditional SPRT, which assumes an infinite time horizon, **FIRMBOUND** adapts decision thresholds dynamically within a predefined limit.
+- **Convex Function Learning (CFL) & Gaussian Process (GP) Regression:** Provides two approaches for solving backward induction to estimate optimal stopping rules.
+- **Density Ratio Estimation (DRE):** Uses **SPRT-TANDEM** to estimate log-likelihood ratios (LLRs) consistently.
+- **Extensive Benchmarking:** Supports synthetic (Gaussian) and real-world, non-i.i.d., multiclass datasets (e.g., SiW, HMDB51, UCF101).
+- **PyTorch Implementation:** Modular and efficient code for training and inference.
 
 ## Quickstart Guide
 
-Follow these steps to utilize the example code provided with our paper:
+### 1. **Generate Sequential Gaussian Dataset**
+Run `generate_sequential_gaussian_as_lmdb.ipynb` to create train, validation, and test LMDB datasets.
+- Modify the header section to specify dataset parameters.
+- Repeat three times to generate different splits.
 
-### Step 1: Run `generate_sequential_gaussian_as_lmdb.ipynb` to Generate Sequential Gaussian Dataset
-- Update the header section to generate train, validation, and test LMDB datasets (run three times with parameters of your choice).
 
+### 2. Train the Log-Likelihood Ratio (LLR) Estimator
+Run `density_ratio_estimation_main.py` to use the SPRT-TANDEM framework to estimate log-density ratios. 
+- Update `./config/config_dre.py` to include paths to the LMDB datasets before running.
+- For more details, check:
+  - [SPRT-TANDEM-PyTorch](https://github.com/Akinori-F-Ebihara/SPRT-TANDEM-PyTorch)
+  - [SPRT-TANDEM tutorial](https://github.com/Akinori-F-Ebihara/SPRT-TANDEM_tutorial)  
 
-### Step 2: Run `density_ratio_estimation_main.py` for Learning to Estimate Log-Likelihood Ratios
-- With the **SPRT-TANDEM** framework [1], we provide a statistically consistent estimator of log-density ratio. For the training details, please see [SPRT-TANDEM-PyTorch](https://github.com/Akinori-F-Ebihara/SPRT-TANDEM-PyTorch). For an intuitive understanding, please refer to the [SPRT-TANDEM tutorial](https://github.com/Akinori-F-Ebihara/SPRT-TANDEM_tutorial). 
-   - Update `./config/config_dre.py` to include paths to the LMDB datasets before running the density ratio estimation.
+### 3. Train **FIRMBOUND**
+Run either `backward_induction_CFL_train.py` or `backward_induction_GP_train.py` to use Convex Function Learning (CFL) or Gaussian Process (GP) regression, respectively.
+- Update the following parameters:
+  - `savedir`: Directory to save model results.
+  - `subproject`: Name matching Step 2 output.
+  - `cost_pool`: Set the sampling cost value.
 
-### Step 3: Train the Model by running `backward_induction_CFL_train.py` or `backward_induction_GP_train.py`.
-- With a Convex Function Learning (CFL) algorithm [2], we provide a statistically consistent estimation of the *backward induction* equation, thereby providing an optimal decision thresholds.
-- We also provide a lightweight alternative using Gaussian Process (GP) regression, significantly reducing training overheads. 
-  - Set the folder path for saving results in `savedir`.
-  - Specify the subproject name created in Step 2 at `subproject`.
-  - Set the sampling cost value in `cost_pool`.
-
-### Step 4: Test the Model
-- Test on the generated dataset by running `backward_induction_GP_test.py` or `backward_induction_CFL_test.py`.
+### 4. Test the Model
+Run inference on the generated dataset by either `backward_induction_GP_test.py` or `backward_induction_CFL_test.py`.
 
 ## Tested Environment
 ```
@@ -44,7 +57,7 @@ optuna      3.1.0
 <img src ="./figures/Binary_optimal_boundary.png" width=70%>  
 </figure>
 </div>
-<p align="center">Figure 2: Example result on the two-class Gaussian dataset. The estimatad optimal decision threshold is depcted with the orange curve. The red and blue trajectories denotes the two classes. Correct decision is made when the red and blue curves hit the positive or negative side of the decision threshold, respectively.</p>
+<p align="center">Figure 2: Two-class Gaussian dataset. The estimated optimal decision threshold is shown in orange. The red and blue trajectories represent different classes. Correct decision is made when the red and blue curves hit the positive or negative side of the decision threshold, respectively.</p>
 
 
 <div align="center">
@@ -52,10 +65,11 @@ optuna      3.1.0
 <img src ="./figures/rotation_animation_gray.gif" width=70%>  
 </figure>
 </div>
-<p align="center">Figure 3: Example result on the three-class Gaussian dataset. The estimatad optimal decision threshold is depcted with the yellow emvelope. The locations where the three class trajectories (red, blue, and yellow) hit the threshold are highlighted with black crosses.</p>
+<p align="center">Figure 3: Three-class Gaussian dataset. The estimated optimal decision threshold is depicted as a yellow envelope. The stopping points for different classes (red, blue, yellow) are marked with black crosses.</p>
 
 ## Citation
-*Please cite the original paper if you use the whole or a part of our code.*
+If you use this code, please cite our paper:
+
 ```
 @inproceedings{FIRMBOUND,
   title={Learning the Optimal Stopping for\\Early Classification within Finite Horizons\\via Sequential Probability Ratio Test},
