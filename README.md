@@ -7,7 +7,7 @@ This repository contains the official PyTorch implementation of **FIRMBOUND**, a
 </figure>
 </div>
 
-<p align="center">Figure 1: SPRT's static threshold (brown) vs. FIRMBOUND's dynamic threshold (yellow).</p>
+<p align="center">Figure 1: FIRMBOUND compared with the classic SPRT.</p>
 
 ---
 
