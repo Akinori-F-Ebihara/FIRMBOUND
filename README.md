@@ -7,7 +7,7 @@ This repository contains the official PyTorch implementation of **FIRMBOUND**, a
 </figure>
 </div>
 
-<p align="center">Figure 1: FIRMBOUND compared with the classic SPRT.</p>
+<p align="center">(Wait for a while to load) Figure 1: FIRMBOUND compared with the classic SPRT.</p>
 
 ---
 
