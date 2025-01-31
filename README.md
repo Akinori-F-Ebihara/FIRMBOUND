@@ -76,5 +76,6 @@ If you use this code, please cite our paper:
   author={Akinori F Ebihara and Taiki Miyagawa and Kazuyuki Sakurai and Hitoshi Imaoka},
   booktitle={International Conference on Learning Representations},
   year={2025},
+  url={https://openreview.net/forum?id=SRghq20nGU}
 }
 ```
